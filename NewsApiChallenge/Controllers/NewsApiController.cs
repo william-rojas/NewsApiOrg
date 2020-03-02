@@ -24,10 +24,17 @@ namespace NewsApiChallenge.Controllers
             _logger = logger;
         }
 
-        public async Task<IActionResult> Index(int pageIndex = 1)
+        //public async Task<IActionResult> Index(int pageIndex = 1, int pageSize = 20, string source = null, DateTime? dateFrom = null, DateTime? dateTo = null, string keyWord = "Apple", string keyWordInTitle = null, string sortBy = null, string language = "en")
+        public async Task<IActionResult> Index([FromQuery] NewsSearchableFields newsSearchableFields, bool newPageIndex)
         {
-            var pageSize = 20;
-            var v = await FetchArticlesData("", DateTime.Today, null, "Apple", null, null, pageIndex, pageSize, "en");
+            if (!newPageIndex)
+                newsSearchableFields.pageIndex = 1;
+
+            var v = await FetchArticlesData(newsSearchableFields);
+
+            var sources = (await FetchSourcesData("", "en", "all")).sources;
+            ViewBag.Source = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(sources, "id", "name");
+            ViewBag.NewsSearchableFields = newsSearchableFields;
 
             if (v.status == "error")
             {
@@ -35,20 +42,16 @@ namespace NewsApiChallenge.Controllers
                 return View(v);
             }
 
-            var usersAsIPagedList = new StaticPagedList<News.Article>(v.articles, pageIndex, pageSize , v.totalResults);
+            var usersAsIPagedList = new StaticPagedList<News.Article>(v.articles, newsSearchableFields.pageIndex, newsSearchableFields.pageSize, v.totalResults);
             ViewBag.OnePageOfUsers = usersAsIPagedList;
 
             return View(v);
         }
 
+
         public async Task<IActionResult> Sources(string category = null, string language = "all", string country = "all")
         {
-            NewsApiSources v;
-            var cfg = new NewsApiConfig(this._configuration);
-            using (var ns = new News.NewsApiService(cfg))
-            {
-                v= await ns.GetSources(category, News.NewsApiService.NewsLanguages.en, News.NewsApiService.Countries.all);
-            }
+            var v = await FetchSourcesData(category, language, country);
 
             if (v.status == "error")
                 ViewBag.Error = v.message;
@@ -56,12 +59,27 @@ namespace NewsApiChallenge.Controllers
             return View(v.sources);            
         }
 
-        public async Task<News.NewsApiArticles> FetchArticlesData(string source, DateTime? fromDate, DateTime? toDate = null, string keyWord = null, string keyWordInTitle = null, string sortBy = null, int page = 0, int pageSize = 20, string language = "en")
+
+        public async Task<News.NewsApiSources> FetchSourcesData(string category, string language, string country)
         {
+            var lan = (NewsApiService.NewsLanguages)Enum.Parse(typeof(NewsApiService.NewsLanguages), language);
+            var count = (NewsApiService.Countries)Enum.Parse(typeof(NewsApiService.Countries), country);
+
+            NewsApiSources v;
             var cfg = new NewsApiConfig(this._configuration);
             using (var ns = new News.NewsApiService(cfg))
             {
-                return await ns.GetEverything(source, fromDate, toDate, keyWord, keyWordInTitle, sortBy, page, pageSize, News.NewsApiService.NewsLanguages.en);
+                return await ns.GetSources(category, lan, count);
+            }
+        }
+
+        public async Task<News.NewsApiArticles> FetchArticlesData(NewsSearchableFields newsSearchableFields)
+        {
+            var lan = string.IsNullOrEmpty(newsSearchableFields.language) ? NewsApiService.NewsLanguages.en : (NewsApiService.NewsLanguages)Enum.Parse(typeof(NewsApiService.NewsLanguages), newsSearchableFields.language);
+            var cfg = new NewsApiConfig(this._configuration);
+            using (var ns = new News.NewsApiService(cfg))
+            {
+                return await ns.GetEverything(newsSearchableFields.source, DateTime.Today, null, newsSearchableFields.keyWord, newsSearchableFields.keyWordInTitle, newsSearchableFields.sortBy, newsSearchableFields.pageIndex, newsSearchableFields.pageSize, lan);
             }
         }
 

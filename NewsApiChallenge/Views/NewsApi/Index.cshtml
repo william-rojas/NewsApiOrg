@@ -35,7 +35,11 @@
         <dd class="col-sm-10">
             @if (Model.articles != null)
             {
-                @Html.Display($"{@Model.articles.Count()} out of {@Model.totalResults}");
+                var fields = (NewsSearchableFields)ViewBag.newsSearchableFields;
+                var pl = (IPagedList)ViewBag.OnePageOfUsers;
+                //var s = $"{@Model.articles.Count()} out of {@Model.totalResults}";
+                var s = $"{@Model.totalResults} articles found; displaying page {pl.PageNumber} out of {pl.PageCount}; page size: {pl.PageSize} ";
+                <text>@s</text>
             }
 
         </dd>
@@ -45,80 +49,103 @@
         <dd class="col-sm-10">
             @Html.DisplayFor(model => model.status)
         </dd>
-        @*<dt class="col-sm-2">
-                @Html.DisplayNameFor(model => model.code)
-            </dt>
-            <dd class="col-sm-10">
-                @Html.DisplayFor(model => model.code)
-            </dd>*@
-        @*<dt class="col-sm-2">
-                @Html.DisplayNameFor(model => model.message)
-            </dt>
-            <dd class="col-sm-10">
-                @Html.DisplayFor(model => model.message)
-            </dd>*@
     </dl>
 </div>
 
 
 
 
-@using (Html.BeginForm("Index"))
+@using (Html.BeginForm("Index", "NewsApi", FormMethod.Get, new { id = "myForm" }))
 {
+    
+    var fields = (NewsSearchableFields)ViewBag.newsSearchableFields;
+
     <div class="container-fluid mb-3">
         <div class="row">
             <h3>Search news</h3>
         </div>
         <div class="row">
             <div class="col-2">Author: </div>
-            <div class="col-2">@Html.TextBox("Author")</div>
+            <div class="col-6">@Html.TextBox("Author", null, new { @class = "form-control" })</div>
         </div>
 
         <div class="row">
             <div class="col-2">Keyword: </div>
-            <div class="col-2">@Html.TextBox("q")</div>
+            <div class="col-6">@Html.TextBox("keyWord", fields.keyWord, new { @class = "form-control" })</div>
         </div>
 
         <div class="row">
             <div class="col-2">Title Keyword: </div>
-            <div class="col-2">@Html.TextBox("Titleq")</div>
+            <div class="col-6">@Html.TextBox("keyWordInTitle", fields.keyWordInTitle, new { @class = "form-control" })</div>
         </div>
+
+        @*<div class="row">
+                <div class="col-2">Source: </div>
+                <div class="col-6">@Html.TextBox("source", fields.source, new { @class = "form-control" })</div>
+            </div>*@
+
         <div class="row">
             <div class="col-2">Source: </div>
-            <div class="col-2">@Html.TextBox("source")</div>
+            <div class="col-6">
+                @Html.DropDownList("Source", null, "--", new { @class = "form-control" })
+            </div>
         </div>
+
+
         <div class="row">
             <div class="col-2">Date From: </div>
-            <div class="col-2">@Html.TextBox("DateFrom")</div>
+            <div class="col-6">@Html.TextBox("DateFrom", fields.DateFrom.HasValue ? fields.DateFrom.Value.ToShortDateString() : null, "{0:MM/dd/yy}", new { @class = "datepicker" })</div>
         </div>
 
         <div class="row">
             <div class="col-2">DateTo: </div>
-            <div class="col-2">@Html.TextBox("DateTo")</div>
-        </div>
-
-        <div class="row">
-            <div class="col-2">Sort By: </div>
-            <div class="col-2">@Html.TextBox("SortBy")</div>
+            <div class="col-6">@Html.TextBox("DateTo", fields.DateTo.HasValue ? fields.DateTo.Value.ToShortDateString() : null, "{0:MM/dd/yy}", new { @class = "datepicker" })</div>
         </div>
 
         <div class="row">
             <div class="col-2">Language: </div>
-            <div class="col-2">@Html.TextBox("Language")</div>
+            <div class="col-6">
+                @Html.DropDownList("Language",
+                    Html.GetEnumSelectList<NewsApiChallenge.News.NewsApiService.NewsLanguages>(),
+                    fields.language, new { @class = "form-control" })
+            </div>
         </div>
+
+        <div class="row d-none">
+            <div class="col-2">Page Index: </div>
+            <div class="col-6">@Html.TextBox("PageIndex", fields.pageIndex, new { @class = "datepicker" })</div>
+        </div>
+
+        <div class="row d-none">
+            <div class="col-2">Page Size: </div>
+            <div class="col-6">@Html.TextBox("PageSize", fields.pageSize, new { @class = "datepicker" })</div>
+        </div>
+
 
         <div class="row">
             <div class="col-2"></div>
-            <div class="col-2"><input class="w-100" type="submit" value="Search" id="btnSubmit" /></div>
+            <div class="col-4"><input class="w-100" type="submit" value="Search" id="btnSubmit" /></div>
+
+ 
+
         </div>
 
     </div>
-}
+
+
 
     @if (Model.articles != null)
     {
         <!-- output a paging control that lets the user navigation to the previous page, next page, etc -->
-        @Html.PagedListPager((IPagedList)ViewBag.OnePageOfUsers, page => Url.Action("Index", new { pageIndex = page }),
+        @Html.PagedListPager((IPagedList)ViewBag.OnePageOfUsers,
+                page =>
+                {
+                    fields.pageIndex = page;
+                    var enc = fields.ToQueryString();
+                    //return Url.Action("Index", new { enc });
+                    return "newsapi?&newPageIndex=true&" + enc;
+                }
+                ,
                 new PagedListRenderOptions
                 {
                     LiElementClasses = new string[] { "page-item" },
@@ -127,92 +154,118 @@
     }
 
 
-    <table class="table" id="articles">
-        <thead>
-            <tr>
-                <th>
-                    @Html.DisplayNameFor(model => model.articles[0].author)
-                </th>
-                <th>
-                    @Html.DisplayNameFor(model => model.articles[0].title)
-                </th>
-                <th>
-                    @Html.DisplayNameFor(model => model.articles[0].description)
-                </th>
-                @*<th>
-                        @Html.DisplayNameFor(model => model.articles[0].url)
-                    </th>
-                    <th>
-                        @Html.DisplayNameFor(model => model.articles[0].urlToImage)
-                    </th>
-                    <th>
-                        @Html.DisplayNameFor(model => model.articles[0].publishedAt)
-                    </th>
-                    <th>
-                        @Html.DisplayNameFor(model => model.articles[0].content)
-                    </th>
-                *@
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
+}
 
-            @if (Model.articles != null)
+
+
+
+<table class="table" id="articles">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.articles[0].author)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.articles[0].title)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.articles[0].description)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.articles[0].source)
+            </th>
+            @*    <th>
+            @Html.DisplayNameFor(model => model.articles[0].urlToImage)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.articles[0].publishedAt)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.articles[0].content)
+        </th>
+            *@
+
+        </tr>
+    </thead>
+    <tbody>
+
+        @if (Model.articles != null)
+        {
+            @foreach (var item in Model.articles)
             {
-                @foreach (var item in Model.articles)
-                {
-                    <tr>
-                        <td>
-                            @Html.DisplayFor(modelItem => item.author)
+                <tr>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.author)
+                    </td>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.title)
+                    </td>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.description)
+                    </td>
+                    <td>
+                        @Html.DisplayFor(modelItem => item.source.name)
+                    </td>
+                    @*<td>
+                            @Html.DisplayFor(modelItem => item.urlToImage)
                         </td>
                         <td>
-                            @Html.DisplayFor(modelItem => item.title)
+                            @Html.DisplayFor(modelItem => item.publishedAt)
                         </td>
                         <td>
-                            @Html.DisplayFor(modelItem => item.description)
-                        </td>
-                        @*<td>
-                                @Html.DisplayFor(modelItem => item.url)
-                            </td>
-                            <td>
-                                @Html.DisplayFor(modelItem => item.urlToImage)
-                            </td>
-                            <td>
-                                @Html.DisplayFor(modelItem => item.publishedAt)
-                            </td>
-                            <td>
-                                @Html.DisplayFor(modelItem => item.content)
-                            </td>*@
-                        <td>
-                            @*@Html.ActionLink("Edit", "Edit", new { /* id=item.PrimaryKey */ }) |*@
-                            @Html.ActionLink("Details", "Details", new { /* id=item.PrimaryKey */ })
-                            @*@Html.ActionLink("Delete", "Delete", new { /* id=item.PrimaryKey */ })*@
-                        </td>
-                    </tr>
-                }
+                            @Html.DisplayFor(modelItem => item.content)
+                        </td>*@
+
+                </tr>
             }
-        </tbody>
+        }
+    </tbody>
 
 
 
-    </table>
+</table>
 
 
 
-    @if (Model.articles != null)
-    {
-        <div>
-            <!-- output a paging control that lets the user navigation to the previous page, next page, etc -->
-            @Html.PagedListPager((IPagedList)ViewBag.OnePageOfUsers, page => Url.Action("Index", new { pageIndex = page }),
-                    new PagedListRenderOptions
-                    {
-                        LiElementClasses = new string[] { "page-item" },
-                        PageClasses = new string[] { "page-link" }
-                    })
-        </div>
-    }
+@if (Model.articles != null)
+{
+    <div>
+        <!-- output a paging control that lets the user navigation to the previous page, next page, etc -->
+        @Html.PagedListPager((IPagedList)ViewBag.OnePageOfUsers, page => Url.Action("Index", new { pageIndex = page }),
+                new PagedListRenderOptions
+                {
+                    LiElementClasses = new string[] { "page-item" },
+                    PageClasses = new string[] { "page-link" }
+                })
+    </div>
+}
 
 
 
+@section Scripts {
+    @* @Scripts.Render("~/bundles/bootstrap") *@
+    @* Render the Bootstrap bundle here if you took it out of the main layout *@
+    @*<script src="https://cdn.jsdelivr.net/npm/gijgo@1.9.6/js/gijgo.min.js" type="text/javascript"></script>*@
+
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.0/themes/smoothness/jquery-ui.css" />
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"
+            integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="
+            crossorigin="anonymous"></script>
+
+    <script>
+        $('.datepicker').datepicker({
+            uiLibrary: 'bootstrap4'
+        });
+
+
+        $('.pagination-container > ul > li > a').on('click', 'a', function (t) {
+
+            alert('clicked on' + t);
+            return false;
+
+        });
+
+    </script>
+}
 
 

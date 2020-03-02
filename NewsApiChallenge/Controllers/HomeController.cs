@@ -22,8 +22,7 @@ namespace NewsApiChallenge.Controllers
             _logger = logger;
         }
 
-        //public IActionResult Index()
-        public async Task<IActionResult> Index()
+        public IActionResult Index()
         {
             return View();
         }
